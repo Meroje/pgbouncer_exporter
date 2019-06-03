@@ -3,14 +3,12 @@ version: '2'
 services:
   postgres:
     image: postgres:9.4
-    ports:
-      - "5432"
 
   pgbouncer:
-    image: starefossen/pgbouncer:latest
+    image: pgbouncer/pgbouncer:latest
+    environment: 
+      - DATABASES_HOST=postgres
     links:
       - postgres
     ports:
-      - "127.0.0.1:6543:6543"
-    volumes:
-      - ./pgbouncer.ini:/pgbouncer.ini
+      - "6432:6432"

@@ -1,7 +1,28 @@
+// Copyright (c) 2017 Kristoffer K Larsen <kristoffer@larsen.so>
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package main
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"math"
@@ -42,17 +63,18 @@ var (
 	}
 )
 
-func NewExporter(connectionString string, namespace string) *Exporter {
+func NewExporter(connectionString string, namespace string) (*Exporter, error) {
 
 	db, err := getDB(connectionString)
 
 	if err != nil {
-		log.Fatal(err)
+		// couldn't open a connection at the time, the driver is smart about it
+		// and we'll just set our up metric to zero
+		log.Errorf("Error opening connection to database: %s", err)
 	}
 
 	return &Exporter{
 		metricMap: makeDescMap(metricMaps, namespace),
-		namespace: namespace,
 		db:        db,
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -77,7 +99,7 @@ func NewExporter(connectionString string, namespace string) *Exporter {
 			Name:      "last_scrape_error",
 			Help:      "Whether the last scrape of metrics from PgBouncer resulted in an error (1 for error, 0 for success).",
 		}),
-	}
+	}, nil
 }
 
 // Query within a namespace mapping and emit metrics. Returns fatal errors if
@@ -88,7 +110,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	// Don't fail on a bad scrape of one metric
 	rows, err := db.Query(query)
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("Error running query on database: ", namespace, err))
+		return []error{}, errors.New(fmt.Sprint("Error running query on database: ", namespace, err))
 	}
 
 	defer rows.Close()
@@ -96,7 +118,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("Error retrieving column list for: ", namespace, err))
+		return []error{}, errors.New(fmt.Sprint("Error retrieving column list for: ", namespace, err))
 	}
 
 	// Make a lookup map for the column indices
@@ -117,7 +139,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		labelValues := make([]string, len(mapping.labels))
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
+			return []error{}, errors.New(fmt.Sprint("Error retrieving rows:", namespace, err))
 		}
 
 		for i, label := range mapping.labels {
@@ -127,7 +149,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 					// Prometheus will fail hard if the database and usernames are not UTF-8
 					if !utf8.ValidString(labelValues[i]) {
-						nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx])))
+						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Column %s in %s has an invalid UTF-8 for a label: %s", columnName, namespace, columnData[idx]))
 						continue
 					}
 				}
@@ -146,7 +168,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 				value, ok := metricMapping.conversion(columnData[idx])
 				if !ok {
-					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
+					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprint("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
 					continue
 				}
 				// Generate the metric
@@ -157,41 +179,31 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	return nonfatalErrors, nil
 }
 
+func pingDB(db *sql.DB) error {
+	var err error
+
+	if _, err = db.Exec("SHOW VERSION;"); err != nil {
+		return driver.ErrBadConn
+	}
+
+	return err
+}
+
 func getDB(conn string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", conn)
 	if err != nil {
 		return nil, err
 	}
-	err = db.Ping()
+
+	err = pingDB(db)
 	if err != nil {
-		return nil, err
+		return db, err
 	}
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
 	return db, nil
-}
-
-// Convert database.sql to string for Prometheus labels. Null types are mapped to empty strings.
-func dbToString(t interface{}) (string, bool) {
-	switch v := t.(type) {
-	case int64:
-		return fmt.Sprintf("%v", v), true
-	case float64:
-		return fmt.Sprintf("%v", v), true
-	case time.Time:
-		return fmt.Sprintf("%v", v.Unix()), true
-	case nil:
-		return "", true
-	case []byte:
-		// Try and convert to string
-		return string(v), true
-	case string:
-		return v, true
-	default:
-		return "", false
-	}
 }
 
 // Convert database.sql types to float64s for Prometheus consumption. Null types are mapped to NaN. string and []byte
@@ -293,6 +305,11 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}(time.Now())
 	log.Info("Starting scrape")
 
+	e.up.Set(0)
+	if err := pingDB(e.db); err == nil {
+		e.up.Set(1)
+	}
+
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
@@ -301,7 +318,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap)
 	if len(errMap) > 0 {
-		log.Fatal(errMap)
+		log.Error(errMap)
 		e.error.Set(1)
 	}
 }

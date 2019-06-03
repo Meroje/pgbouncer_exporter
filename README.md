@@ -1,4 +1,8 @@
-# PgBouncer exporter
+# PgBouncer Exporter [![Build Status](https://travis-ci.org/Meroje/pgbouncer_exporter.svg)][travis]
+
+[![CircleCI](https://circleci.com/gh/Meroje/pgbouncer_exporter/tree/master.svg?style=shield)][circleci]
+[![Docker Repository on Quay](https://quay.io/repository/meroje/pgbouncer-exporter/status)][quay]
+[![Docker Pulls](https://img.shields.io/docker/pulls/meroje/pgbouncer-exporter.svg?maxAge=604800)][hub]
 
 Prometheus exporter for PgBouncer.
 Exports metrics at `9127/metrics`
@@ -15,7 +19,7 @@ To see all available configuration flags:
 ## Run with Docker
 
 ```
-docker run chriscowley/pgbouncer_exporter -pgBouncer.connectionString=postgres://postgres:@pgbouncer:6432/pgbouncer?sslmode=disable
+docker run meroje/pgbouncer-exporter -pgBouncer.connectionString=postgres://postgres:@pgbouncer:6432/pgbouncer?sslmode=disable
 ```
 
 ## Metrics
@@ -38,3 +42,9 @@ pools.sv_used | pgbouncer_pools_server_used_connections | Server connections idl
 pools.sv_tested | pgbouncer_pools_server_testing_connections | Server connections currently running either server_reset_query or server_check_query, shown as connection
 pools.sv_login | pgbouncer_pools_server_login_connections | Server connections currently in the process of logging in, shown as connection
 pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection, shown as second
+
+
+[travis]: https://travis-ci.org/Meroje/pgbouncer_exporter
+[circleci]: https://circleci.com/gh/Meroje/pgbouncer_exporter
+[quay]: https://quay.io/repository/meroje/pgbouncer-exporter
+[hub]: https://hub.docker.com/r/meroje/pgbouncer-exporter/
