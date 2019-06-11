@@ -60,6 +60,13 @@ var (
 			"sv_login":   {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection"},
 			"maxwait":    {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
 		},
+		"databases": {
+			"database":            {LABEL, "N/A", 1, "N/A"},
+			"pool_size":           {GAUGE, "pool_size", 1, "Configured Pool Size Limit"},
+			"reserve_pool":        {GAUGE, "reserve_pool_size", 1, "Configured Reserve Limit"},
+			"max_connections":     {GAUGE, "max_connections", 1, "Max number of connections"},
+			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections"},
+		},
 	}
 )
 
