@@ -19,7 +19,7 @@ To see all available configuration flags:
 ## Run with Docker
 
 ```
-docker run meroje/pgbouncer-exporter -pgBouncer.connectionString=postgres://postgres:@pgbouncer:6432/pgbouncer?sslmode=disable
+docker run meroje/pgbouncer-exporter --pgBouncer.connectionString=postgres://postgres:@pgbouncer:6432/pgbouncer?sslmode=disable
 ```
 
 ## Metrics
