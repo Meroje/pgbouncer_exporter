@@ -30,7 +30,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -183,6 +183,10 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("Failed scaning all rows due to scan failure: error was; %s", err)
+		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %s", err))
+	}
 	return nonfatalErrors, nil
 }
 
@@ -197,15 +201,11 @@ func pingDB(db *sql.DB) error {
 }
 
 func getDB(conn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", conn)
+	connector, err := pq.NewConnector(conn)
 	if err != nil {
 		return nil, err
 	}
-
-	err = pingDB(db)
-	if err != nil {
-		return db, err
-	}
+	db := sql.OpenDB(connector)
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -312,16 +312,22 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	}(time.Now())
 	log.Info("Starting scrape")
 
-	e.up.Set(0)
-	if err := pingDB(e.db); err == nil {
-		e.up.Set(1)
-	}
-
-	e.error.Set(0)
-	e.totalScrapes.Inc()
-
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
+
+	e.totalScrapes.Inc()
+
+	err := pingDB(e.db)
+	if err == nil {
+		e.up.Set(1)
+		e.error.Set(0)
+	}
+	if err != nil {
+		e.up.Set(0)
+		e.error.Set(1)
+		log.Error(err)
+		return
+	}
 
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap)
 	if len(errMap) > 0 {
