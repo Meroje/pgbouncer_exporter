@@ -62,10 +62,10 @@ var (
 		},
 		"databases": {
 			"database":            {LABEL, "N/A", 1, "N/A"},
-			"pool_size":           {GAUGE, "pool_size", 1, "Configured Pool Size Limit"},
-			"reserve_pool":        {GAUGE, "reserve_pool_size", 1, "Configured Reserve Limit"},
-			"max_connections":     {GAUGE, "max_connections", 1, "Max number of connections"},
-			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections"},
+			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of pool backend connections"},
+			"reserve_pool":        {GAUGE, "reserve_pool_size", 1, "Maximum amount that the pool size can be exceeded temporarily"},
+			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of client connections allowed"},
+			"current_connections": {GAUGE, "current_connections", 1, "Current number of client connections"},
 		},
 	}
 )

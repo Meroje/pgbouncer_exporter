@@ -42,6 +42,10 @@ pools.sv_used | pgbouncer_pools_server_used_connections | Server connections idl
 pools.sv_tested | pgbouncer_pools_server_testing_connections | Server connections currently running either server_reset_query or server_check_query, shown as connection
 pools.sv_login | pgbouncer_pools_server_login_connections | Server connections currently in the process of logging in, shown as connection
 pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection, shown as second
+databases.pool_size | Maximum number of pool backend connections
+databases.reserve_pool | Maximum amount that the pool size can be exceeded temporarily
+databases.max_connections | Maximum number of client connections allowed
+databases.current_connections | Current number of client connections
 
 
 [travis]: https://travis-ci.org/Meroje/pgbouncer_exporter
