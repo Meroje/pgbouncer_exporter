@@ -45,7 +45,6 @@ jobs:
     - setup_remote_docker
     - attach_workspace:
         at: .
-    - run: ln -s .build/linux-amd64/pgbouncer_exporter pgbouncer_exporter
     - run: make docker
     - run: make docker DOCKER_REPO=quay.io/meroje
     - run: docker images
@@ -71,7 +70,6 @@ jobs:
     - store_artifacts:
         path: .tarballs
         destination: releases
-    - run: ln -s .build/linux-amd64/pgbouncer_exporter pgbouncer_exporter
     - run: make docker DOCKER_IMAGE_TAG=$CIRCLE_TAG
     - run: make docker DOCKER_IMAGE_TAG=$CIRCLE_TAG DOCKER_REPO=quay.io/meroje
     - run: docker login -u $DOCKER_LOGIN -p $DOCKER_PASSWORD
